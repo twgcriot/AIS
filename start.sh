@@ -13,11 +13,11 @@ if [[ -f .env ]]; then
   set +a
 fi
 export AIS_AGENT_NAME="${AIS_AGENT_NAME:-PythonAgent}"
-export AIS_CLIENT_ID="${AIS_CLIENT_ID:-3d31bc97-40fc-4554-9ee6-5f8029620628}"
-export AIS_ENTRA_TENANT="${AIS_ENTRA_TENANT:-oogwaysanhotmail.onmicrosoft.com}"
-export AIS_ENTRA_CLIENT_ID="${AIS_ENTRA_CLIENT_ID:-c254321d-fe98-48e7-b7bf-9f94832acada}"
-export AIS_ENTRA_REDIRECT_URI="${AIS_ENTRA_REDIRECT_URI:-http://localhost:7777/callback}"
-export AIS_REDIRECT_URI="${AIS_REDIRECT_URI:-http://localhost:9999/callback}"
+export AGENT_CLIENT_ID="${AGENT_CLIENT_ID:-3d31bc97-40fc-4554-9ee6-5f8029620628}"
+export WEBAPP_ENTRA_TENANT="${WEBAPP_ENTRA_TENANT:-oogwaysanhotmail.onmicrosoft.com}"
+export WEBAPP_ENTRA_CLIENT_ID="${WEBAPP_ENTRA_CLIENT_ID:-c254321d-fe98-48e7-b7bf-9f94832acada}"
+export WEBAPP_REDIRECT_URI="${WEBAPP_REDIRECT_URI:-http://localhost:7777/callback}"
+export AGENT_REDIRECT_URI="${AGENT_REDIRECT_URI:-http://localhost:9999/callback}"
 export AIS_FRONTEND_URL="${AIS_FRONTEND_URL:-http://localhost:7777}"
 export AIS_GATEWAY="${AIS_GATEWAY:-https://mcp-aigw.portkey.ai}"
 export AIS_DEEPWIKI_SLUG="${AIS_DEEPWIKI_SLUG:-deepwikimcp}"

@@ -39,11 +39,11 @@ def load_env(path: Path) -> None:
 load_env(Path(__file__).with_name(".env"))
 
 PORT = int(os.environ.get("AIS_FRONTEND_PORT", "7777"))
-REDIRECT_URI = os.environ.get("AIS_ENTRA_REDIRECT_URI", f"http://localhost:{PORT}/callback")
-ENTRA_TENANT = os.environ.get("AIS_ENTRA_TENANT", "oogwaysanhotmail.onmicrosoft.com")
-ENTRA_CLIENT_ID = os.environ.get("AIS_ENTRA_CLIENT_ID", "")
-GATEWAY_CLIENT_ID = os.environ.get("AIS_CLIENT_ID", "")
-GATEWAY_REDIRECT_URI = os.environ.get("AIS_REDIRECT_URI", "http://localhost:9999/callback")
+REDIRECT_URI = os.environ.get("WEBAPP_REDIRECT_URI", f"http://localhost:{PORT}/callback")
+ENTRA_TENANT = os.environ.get("WEBAPP_ENTRA_TENANT", "oogwaysanhotmail.onmicrosoft.com")
+ENTRA_CLIENT_ID = os.environ.get("WEBAPP_ENTRA_CLIENT_ID", "")
+GATEWAY_CLIENT_ID = os.environ.get("AGENT_CLIENT_ID", "")
+GATEWAY_REDIRECT_URI = os.environ.get("AGENT_REDIRECT_URI", "http://localhost:9999/callback")
 ENTRA_SCOPE = "openid profile email"
 ENTRA_AUTHORIZE = f"https://login.microsoftonline.com/{ENTRA_TENANT}/oauth2/v2.0/authorize"
 ENTRA_TOKEN = f"https://login.microsoftonline.com/{ENTRA_TENANT}/oauth2/v2.0/token"
@@ -751,7 +751,7 @@ class App(BaseHTTPRequestHandler):
 
     def start_login(self) -> None:
         if not ENTRA_CLIENT_ID:
-            self.respond(*home(None, "AIS_ENTRA_CLIENT_ID is not set."))
+            self.respond(*home(None, "WEBAPP_ENTRA_CLIENT_ID is not set."))
             return
         set_entra("authorize")
         verifier, challenge = pkce()
@@ -842,9 +842,9 @@ class App(BaseHTTPRequestHandler):
 def serve() -> None:
     parsed = urllib.parse.urlparse(REDIRECT_URI)
     if parsed.hostname not in {"127.0.0.1", "localhost"} or parsed.path != "/callback" or (parsed.port or 80) != PORT:
-        raise SystemExit(f"AIS_ENTRA_REDIRECT_URI must be http://localhost:{PORT}/callback, got {REDIRECT_URI}")
+        raise SystemExit(f"WEBAPP_REDIRECT_URI must be http://localhost:{PORT}/callback, got {REDIRECT_URI}")
     if not ENTRA_CLIENT_ID:
-        raise SystemExit("Missing environment variable AIS_ENTRA_CLIENT_ID")
+        raise SystemExit("Missing environment variable WEBAPP_ENTRA_CLIENT_ID")
     servers: list[ThreadingHTTPServer] = []
     for family, address in ((socket.AF_INET, "127.0.0.1"), (socket.AF_INET6, "::1")):
         try:

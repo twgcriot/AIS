@@ -38,8 +38,8 @@ def load_env(path: Path) -> None:
 load_env(Path(__file__).with_name(".env"))
 
 AGENT_NAME = os.environ.get("AIS_AGENT_NAME", "PythonAgent")
-CLIENT_ID = os.environ["AIS_CLIENT_ID"]
-REDIRECT_URI = os.environ.get("AIS_REDIRECT_URI", "http://localhost:9999/callback")
+CLIENT_ID = os.environ["AGENT_CLIENT_ID"]
+REDIRECT_URI = os.environ.get("AGENT_REDIRECT_URI", "http://localhost:9999/callback")
 FRONTEND = os.environ.get("AIS_FRONTEND_URL", "http://localhost:7777").rstrip("/")
 GATEWAY = os.environ.get("AIS_GATEWAY", "https://mcp-aigw.portkey.ai").rstrip("/")
 DEEPWIKI_SLUG = os.environ.get("AIS_DEEPWIKI_SLUG", "deepwikimcp")
@@ -920,7 +920,7 @@ def serve() -> None:
     parsed = urllib.parse.urlparse(REDIRECT_URI)
     frontend = urllib.parse.urlparse(FRONTEND)
     if parsed.hostname not in {"127.0.0.1", "localhost"} or parsed.path != "/callback" or (parsed.port or 80) != 9999:
-        raise SystemExit(f"AIS_REDIRECT_URI must be http://localhost:9999/callback, got {REDIRECT_URI}")
+        raise SystemExit(f"AGENT_REDIRECT_URI must be http://localhost:9999/callback, got {REDIRECT_URI}")
     if frontend.hostname not in {"127.0.0.1", "localhost"} or (frontend.port or 80) != 7777:
         raise SystemExit(f"AIS_FRONTEND_URL must be http://localhost:7777, got {FRONTEND}")
     port = parsed.port or 9999

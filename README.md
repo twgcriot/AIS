@@ -33,7 +33,7 @@ The browser holds two different tokens. They are not interchangeable.
 | | Web app session | MCP call |
 |---|---|---|
 | Who issues it | Entra Directory | AI Gateway |
-| Client | `AIS_ENTRA_CLIENT_ID` | `AIS_CLIENT_ID` |
+| Client | `WEBAPP_ENTRA_CLIENT_ID` | `AGENT_CLIENT_ID` |
 | Redirect | `http://localhost:7777/callback` | `http://localhost:9999/callback` |
 | Scopes | `openid profile email` | Gateway MCP scopes (`mcp:*` and the scopes advertised by deepwiki) |
 | Who consumes it | The web app, to show the signed-in user | deepwiki, as `Authorization: Bearer` |
@@ -47,7 +47,7 @@ Signing in to the web app does not sign the user in to the gateway. Sharing the 
 
 1. The web app creates a PKCE S256 verifier and a nonce, then redirects the browser to the tenant authorize endpoint:
 
-   `https://login.microsoftonline.com/{AIS_ENTRA_TENANT}/oauth2/v2.0/authorize`
+   `https://login.microsoftonline.com/{WEBAPP_ENTRA_TENANT}/oauth2/v2.0/authorize`
 
    The request is an authorization-code grant with `prompt=select_account`. The tenant is specific. This app is single-tenant, so the `/common` endpoint is not used.
 
@@ -112,14 +112,14 @@ On a saved-token call, step 6 is still drawn so the authentication and authoriza
 
 ## Entra app registration
 
-Register the web app in the same directory the demo uses (`AIS_ENTRA_TENANT`, default `oogwaysanhotmail.onmicrosoft.com`):
+Register the web app in the same directory the demo uses (`WEBAPP_ENTRA_TENANT`, default `oogwaysanhotmail.onmicrosoft.com`):
 
 - Single-tenant app.
 - Platform **Mobile and desktop applications**, redirect URI `http://localhost:7777/callback`.
 - **Allow public client flows** enabled.
 - No client secret. A confidential **Web** registration makes the token exchange fail because this process redeems the code with PKCE only.
 
-The gateway client is separate. Its redirect URI is `http://localhost:9999/callback`, and it stays the value of `AIS_CLIENT_ID`. Registering the web app in Entra does not make the gateway accept the Entra access token.
+The gateway client is separate. Its redirect URI is `http://localhost:9999/callback`, and it stays the value of `AGENT_CLIENT_ID`. Registering the web app in Entra does not make the gateway accept the Entra access token.
 
 ## Run
 
@@ -133,11 +133,11 @@ The gateway client is separate. Its redirect URI is `http://localhost:9999/callb
 
 | Variable | Purpose |
 |---|---|
-| `AIS_ENTRA_TENANT` | Entra tenant for the web app authorize and token URLs |
-| `AIS_ENTRA_CLIENT_ID` | Public client id of the web app |
-| `AIS_ENTRA_REDIRECT_URI` | Must stay `http://localhost:7777/callback` |
-| `AIS_CLIENT_ID` | Public client id of the AI Gateway app |
-| `AIS_REDIRECT_URI` | Must stay `http://localhost:9999/callback` |
+| `WEBAPP_ENTRA_TENANT` | Entra tenant for the web app authorize and token URLs |
+| `WEBAPP_ENTRA_CLIENT_ID` | Public client id of the web app |
+| `WEBAPP_REDIRECT_URI` | Must stay `http://localhost:7777/callback` |
+| `AGENT_CLIENT_ID` | Public client id of the AI Gateway app |
+| `AGENT_REDIRECT_URI` | Must stay `http://localhost:9999/callback` |
 | `AIS_FRONTEND_URL` | Must stay `http://localhost:7777` |
 | `AIS_GATEWAY` | Gateway origin, default `https://mcp-aigw.portkey.ai` |
 | `AIS_DEEPWIKI_SLUG` | MCP server slug, default `deepwikimcp` |
