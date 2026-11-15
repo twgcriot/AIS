@@ -296,7 +296,39 @@ def page(title: str, body: str, status: int = 200) -> tuple[int, bytes]:
       overflow: auto;
     }}
     .diagram svg {{ max-width: 100%; height: auto; }}
-    .live {{ margin: 0 0 14px; font: 15px/1.4 ui-sans-serif, system-ui, sans-serif; }}
+    .live {{ margin: 10px 0 18px; font: 15px/1.4 ui-sans-serif, system-ui, sans-serif; }}
+    .crumbs {{ margin: 0; }}
+    .crumbs ol {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 0;
+      list-style: none;
+      margin: 0;
+      padding: 14px 16px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }}
+    .crumbs li {{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      font: 13px/1.2 ui-sans-serif, system-ui, sans-serif;
+    }}
+    .crumbs .sep {{ color: var(--muted); font-size: 11px; padding-right: 2px; }}
+    .crumbs .name {{
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: #fffdf9;
+      color: var(--muted);
+    }}
+    .crumbs li.done .name {{ background: #ecfdf3; border-color: #166534; color: #166534; }}
+    .crumbs li.now .name {{ background: #fff1e6; border-color: #9a3412; color: #9a3412; }}
+    .crumbs li.skip .name {{ background: #f6f1ea; border-color: #b7aea3; color: #8a8178; }}
+    .crumbs li.done .sep, .crumbs li.now .sep {{ color: var(--accent); }}
+    .crumbs li.skip .sep {{ color: #b7aea3; }}
     @media (max-width: 800px) {{ .lanes {{ grid-template-columns: 1fr; }} }}
     .log {{ margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }}
     .log h3 {{ margin: 0; font-size: 16px; }}
@@ -373,6 +405,34 @@ def render_logs(logs: list[dict]) -> str:
     return "".join(blocks)
 
 
+def flow_breadcrumb() -> str:
+    steps = [
+        ("User", ""),
+        ("Web app", "opens"),
+        ("Entra Directory", "sign-in"),
+        ("Web app", "user token"),
+        ("Python agent", "call"),
+        ("AIGW", "gateway token"),
+        ("AIS / Idira", "authenticate"),
+        ("Entra Directory", "authenticate"),
+        ("AIS / Idira", "authenticated"),
+        ("AIGW", "authenticated"),
+        ("AIS / Idira", "authorize"),
+        ("AIGW", "authorized"),
+        ("MCP server", "MCP data"),
+        ("Web app", "result"),
+    ]
+    items = []
+    for label, edge in steps:
+        sep = f'<span class="sep">{html.escape(edge)}</span>' if edge else ""
+        items.append(f'<li class="ahead">{sep}<span class="name">{html.escape(label)}</span></li>')
+    return (
+        '<nav class="crumbs" id="crumbs" aria-label="Live flow">'
+        f'<ol>{"".join(items)}</ol></nav>'
+        '<p class="live" id="live">Waiting for a sign-in or an agent call.</p>'
+    )
+
+
 def display_name(identity: dict[str, str]) -> str:
     return identity.get("preferred_username") or identity.get("name") or "Signed in"
 
@@ -431,21 +491,27 @@ def live_state(identity: dict[str, str] | None) -> dict:
 
 FLOW_SCRIPT = r"""
 <script type="module">
-  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: "strict",
-    theme: "base",
-    flowchart: { curve: "basis", htmlLabels: true, padding: 16 },
-    themeVariables: {
-      fontFamily: "ui-sans-serif, system-ui, sans-serif",
-      primaryColor: "#fffdf9",
-      primaryBorderColor: "#e4ddd3",
-      primaryTextColor: "#1c1915",
-      lineColor: "#b7aea3",
-      background: "#fffdf9"
-    }
-  });
+  let mermaidApi = null;
+  async function loadMermaid() {
+    if (mermaidApi) return mermaidApi;
+    const mod = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    mermaidApi = mod.default;
+    mermaidApi.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme: "base",
+      flowchart: { curve: "basis", htmlLabels: true, padding: 16 },
+      themeVariables: {
+        fontFamily: "ui-sans-serif, system-ui, sans-serif",
+        primaryColor: "#fffdf9",
+        primaryBorderColor: "#e4ddd3",
+        primaryTextColor: "#1c1915",
+        lineColor: "#b7aea3",
+        background: "#fffdf9"
+      }
+    });
+    return mermaidApi;
+  }
   const names = {
     User: "User",
     WebApp: "Web app",
@@ -556,11 +622,51 @@ FLOW_SCRIPT = r"""
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const box = document.querySelector("#diagram");
+  const crumbs = document.querySelector("#crumbs");
   const caption = document.querySelector("#live");
   const list = document.querySelector("#steps");
   let playedKey = "";
   let playedCount = 0;
+  let crumbKey = "";
+  let crumbCount = 0;
   let running = false;
+
+  function paintCrumbs(revealed, active, skips) {
+    [...crumbs.querySelectorAll("li")].forEach((node, index) => {
+      const skipped = index > 0 && skips[index - 1];
+      let cls = "ahead";
+      if (index < revealed) cls = skipped ? "done skip" : "done";
+      if (index === active) cls = skipped ? "now skip" : "now";
+      node.className = cls;
+      if (index === active) node.setAttribute("aria-current", "step");
+      else node.removeAttribute("aria-current");
+    });
+  }
+
+  async function playCrumbs(beats) {
+    const skips = beats.map((beat) => beat.skip);
+    const key = beats.map((beat) => beat.from + ">" + beat.to + ":" + beat.label).join("|");
+    if (!key) {
+      crumbKey = "";
+      crumbCount = 0;
+      paintCrumbs(0, -1, []);
+      if (caption) caption.textContent = phrases.idle;
+      return;
+    }
+    const restart = !crumbKey || !key.startsWith(crumbKey);
+    if (!restart && crumbCount >= beats.length) return;
+    if (restart) crumbCount = 0;
+    crumbKey = key;
+    if (crumbCount > 0) paintCrumbs(crumbCount, -1, skips);
+    else paintCrumbs(0, -1, skips);
+    for (let index = crumbCount; index < beats.length; index += 1) {
+      if (caption) caption.textContent = beats[index].caption;
+      paintCrumbs(index + 1, index + 1, skips);
+      crumbCount = index + 1;
+      await wait(850);
+    }
+    paintCrumbs(beats.length, beats.length, skips);
+  }
 
   async function play(beats) {
     const key = beats.map((beat) => beat.from + ">" + beat.to + ":" + beat.label).join("|");
@@ -575,7 +681,7 @@ FLOW_SCRIPT = r"""
     if (!restart && playedCount >= beats.length) return;
     if (restart) playedCount = 0;
     playedKey = key;
-    const drawn = await mermaid.render("liveflow" + Date.now(), diagram(beats));
+    const drawn = await (await loadMermaid()).render("liveflow" + Date.now(), diagram(beats));
     box.innerHTML = drawn.svg;
     const paths = edgePaths();
     paths.forEach(hideEdge);
@@ -607,16 +713,19 @@ FLOW_SCRIPT = r"""
     const response = await fetch("/flow/live", { cache: "no-store" });
     const state = await response.json();
     const told = story(state);
-    list.replaceChildren();
-    const rows = told.steps.length ? told.steps : [{ status: "", step: "No agent call yet.", detail: "" }];
-    for (const step of rows) {
-      const item = document.createElement("li");
-      item.textContent = step.status === "" ? step.step : `HTTP ${step.status} ${step.step}${step.detail ? " · " + step.detail : ""}`;
-      list.append(item);
+    if (list) {
+      list.replaceChildren();
+      const rows = told.steps.length ? told.steps : [{ status: "", step: "No agent call yet.", detail: "" }];
+      for (const step of rows) {
+        const item = document.createElement("li");
+        item.textContent = step.status === "" ? step.step : `HTTP ${step.status} ${step.step}${step.detail ? " · " + step.detail : ""}`;
+        list.append(item);
+      }
     }
     running = true;
     try {
-      await play(told.beats);
+      if (box) await play(told.beats);
+      if (crumbs) await playCrumbs(told.beats);
     } finally {
       running = false;
     }
@@ -658,6 +767,7 @@ def home(identity: dict[str, str] | None, notice: str = "", logs: list[dict] | N
         )
         body = f"""
     {tabs("call")}
+    {flow_breadcrumb()}
     <header>
       <p>AI Gateway</p>
       <h1>Call the Python agent</h1>
@@ -671,10 +781,12 @@ def home(identity: dict[str, str] | None, notice: str = "", logs: list[dict] | N
       <a class="quiet" href="/logout">Sign out</a>
       {logs_html}
     </section>
+    {FLOW_SCRIPT}
     """
         return page("Call the Python agent", body)
     body = f"""
     {tabs("call")}
+    {flow_breadcrumb()}
     <header>
       <p>Entra ID</p>
       <h1>Sign in</h1>
@@ -686,6 +798,7 @@ def home(identity: dict[str, str] | None, notice: str = "", logs: list[dict] | N
       <a class="button" href="/login">Sign in</a>
       {logs_html}
     </section>
+    {FLOW_SCRIPT}
     """
     return page("Sign in", body)
 
